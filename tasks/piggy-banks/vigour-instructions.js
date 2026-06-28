@@ -1,6 +1,6 @@
-import { updatePersistentCoinContainer, observeResizing, dropCoin } from './vigour-utils.js';
+import { updatePersistentCoinContainer, observeResizing, dropCoin, attachHoldKeyListeners, detachHoldKeyListeners, getResponseKeyLabel, getHandednessLabel } from './vigour-utils.js';
 import { shakePiggy } from './utils.js';
-import { updateState } from '@utils/index.js';
+import { updateState, showTemporaryWarning } from '@utils/index.js';
 
 /**
  * Interactive instruction page that demonstrates the piggy bank shaking mechanism
@@ -25,13 +25,26 @@ const instructionPage = {
     const bottomContainer = document.getElementById('bottom-container');
     const experimentContainer = document.getElementById('experiment-container');
     const buttonInstruction = document.getElementById('button-instruction');
-    let keyboardListener = setupKeyboardListener(handleSpacebar);
+    let lastHoldWarningTime = 0;
+    attachHoldKeyListeners({ onValidPress: handleResponse, onHoldViolation: warnHold });
 
     /**
-     * Handles spacebar presses during the instruction demo
+     * Warns (throttled) when the response key is tapped without the three hold
+     * keys held down.
+     */
+    function warnHold() {
+      const now = performance.now();
+      if (now - lastHoldWarningTime > 1500) {
+        lastHoldWarningTime = now;
+        showTemporaryWarning("Keep holding 'F', 'T', and 'H'", 800);
+      }
+    }
+
+    /**
+     * Handles a valid response-key tap during the instruction demo
      * Provides immediate feedback and coin rewards
      */
-    function handleSpacebar() {
+    function handleResponse() {
       shakeCount++;
       shakePiggy();
       updateInstructionText(shakeCount);
@@ -75,8 +88,8 @@ const instructionPage = {
       bottomContainer.style.visibility = 'hidden';
       buttonInstruction.style.fontSize = '';
       buttonInstruction.style.color = '';
-      jsPsych.pluginAPI.cancelKeyboardResponse(keyboardListener);
-      keyboardListener = setupKeyboardListener(handleSpacebar);
+      detachHoldKeyListeners();
+      attachHoldKeyListeners({ onValidPress: handleResponse, onHoldViolation: warnHold });
       const coinContainer = document.getElementById('coin-container');
       coinContainer.innerHTML = '';
     }
@@ -88,24 +101,28 @@ const instructionPage = {
     // Simulate user interaction for testing mode
     if (window.simulating) {
       async function simulateKeyPressesAndClick() {
-        const pressKeyPromises = [];
-        // Simulate FR + 1 key presses to trigger coin drop and continue option
-        for (let i = 0; i < FR + 1; i++) {
-          const scheduledTime = 100 * i + 1; // Delay for this specific key press
+        const responseKey = getResponseKeyLabel().toLowerCase();
+        // Hold the three keys down for the whole demo.
+        ['f', 't', 'h'].forEach(k => document.dispatchEvent(new KeyboardEvent('keydown', { key: k })));
 
+        const pressKeyPromises = [];
+        // Simulate FR + 1 valid taps to trigger coin drop and continue option
+        for (let i = 0; i < FR + 1; i++) {
+          const scheduledTime = 100 * i + 1; // Delay for this specific tap
           pressKeyPromises.push(
-        new Promise(resolve => {
-          // Schedule the key press simulation
-          jsPsych.pluginAPI.pressKey('b', scheduledTime);
-          
-          // This promise resolves when the time for this key press simulation has passed
-          setTimeout(resolve, scheduledTime);
-        })
+            new Promise(resolve => {
+              setTimeout(() => {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: responseKey }));
+                document.dispatchEvent(new KeyboardEvent('keyup', { key: responseKey }));
+                resolve();
+              }, scheduledTime);
+            })
           );
         }
 
-        // Wait for all key presses to be simulated
+        // Wait for all taps to be simulated
         await Promise.all(pressKeyPromises);
+        ['f', 't', 'h'].forEach(k => document.dispatchEvent(new KeyboardEvent('keyup', { key: k })));
 
         // Simulate clicking continue button
         jsPsych.pluginAPI.clickTarget(document.getElementById('continue-button'), 100);
@@ -116,6 +133,7 @@ const instructionPage = {
     }
   },
   on_finish: function () {
+    detachHoldKeyListeners();
     jsPsych.pluginAPI.cancelAllKeyboardResponses();
   }
 };
@@ -167,22 +185,27 @@ const ruleInstruction = {
  */
 const startConfirmation = {
   type: jsPsychHtmlKeyboardResponse,
-  choices: ['b', 'r'], // 'b' to begin, 'r' to restart instructions
-  stimulus: `
+  // Begin with the participant's response key, or 'r' to restart instructions.
+  choices: () => [getResponseKeyLabel().toLowerCase(), 'r'],
+  stimulus: function () {
+    const label = getResponseKeyLabel();
+    const hand = getHandednessLabel();
+    return `
   <div id="instruction-text">
       <p>You will now play the piggy-bank game without a break for about <strong>four minutes</strong>.</p>
-      <p>When you're ready, place the <strong>index finger of the hand you write with</strong> comfortably on the <span class="spacebar-icon">B</span> key, as shown below.</p>
-      <p>Use only this finger to press during the game.</p>
-      <p>Press it once to begin.</p>
+      <p>When you're ready, place your <strong>index, middle and ring fingers</strong> on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys and keep them <strong>held down</strong> throughout the game.</p>
+      <p>Use the <strong>little finger of your ${hand} hand</strong> to tap the <span class="spacebar-icon">${label}</span> key, as shown below.</p>
       <img src="./assets/images/piggy-banks/vigour_key.png" style="width:250px;" alt="Key press illustration">
+      <p>While holding the three keys, tap <span class="spacebar-icon">${label}</span> once to begin.</p>
       <p>If you want to start over from the beginning, press <span class="spacebar-icon">R</span>.</p>
   </div>
-    `,
+    `;
+  },
   post_trial_gap: 300,
   data: {trialphase: 'vigour_instructions'},
   simulation_options: {
     data: {
-      response: 'b'
+      response: () => getResponseKeyLabel().toLowerCase()
     }
   },
   on_finish: function (data) {
@@ -248,10 +271,12 @@ function generateInstructStimulus() {
  * @param {number} shakeCount - Number of times user has pressed the key
  */
 function updateInstructionText(shakeCount) {
+  const label = getResponseKeyLabel();
+  const holdKeys = `<span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span>`;
   const messages = [
-    '<p>Welcome to the piggy bank game!</p><p>Press <span class="spacebar-icon">B</span> on the keyboard to shake this piggy bank!</p>',
-    '<p>Press <span class="spacebar-icon">B</span> on the keyboard to shake this piggy bank!</p><p>You can press <span class="spacebar-icon">B</span> again to keep on shaking...</p>',
-    '<p>Well done, You just got a coin out of the piggy bank!</p><p><span class="highlight-txt">You can always press again for more coins.</span> Try getting some more!</p>'
+    `<p>Welcome to the piggy bank game!</p><p>Hold the ${holdKeys} keys down with your index, middle and ring fingers, then tap the <span class="spacebar-icon">${label}</span> key with your little finger to shake this piggy bank!</p>`,
+    `<p>Keep holding ${holdKeys}, and tap <span class="spacebar-icon">${label}</span> with your little finger to shake the piggy bank!</p><p>Keep tapping to shake more...</p>`,
+    '<p>Well done, You just got a coin out of the piggy bank!</p><p><span class="highlight-txt">You can always tap again for more coins.</span> Try getting some more!</p>'
   ];
   let messageIndex = 0;
   if (shakeCount < 1) {
@@ -262,19 +287,4 @@ function updateInstructionText(shakeCount) {
     messageIndex = 2; // Success message after first coin
   }
   document.getElementById('instruction-text').innerHTML = messages[messageIndex];
-}
-
-/**
- * Sets up keyboard listener for the instruction demo
- * @param {Function} callback - Function to call when valid key is pressed
- * @returns {Object} Keyboard listener object for cleanup
- */
-function setupKeyboardListener(callback) {
-  return jsPsych.pluginAPI.getKeyboardResponse({
-    callback_function: callback,
-    valid_responses: ['b'],
-    rt_method: 'performance',
-    persist: true,
-    allow_held_key: false
-  });
 }

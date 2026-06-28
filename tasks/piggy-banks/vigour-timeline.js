@@ -1,4 +1,4 @@
-import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES } from './vigour-utils.js';
+import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial } from './vigour-utils.js';
 import { vigour_instructions } from './vigour-instructions.js';
 import { createPreloadTrial } from '../../core/utils/index.js';
 
@@ -11,11 +11,14 @@ export function createVigourTimeline(settings) {
     const vigourTimeline = [
         // Preload all images required for the vigour task
         createPreloadTrial(VIGOUR_PRELOAD_IMAGES, settings.task_name),
+        // Ask handedness up front so all instructions and trials use the
+        // correct little-finger response key (X for left, M for right).
+        vigourHandednessTrial(),
         // Show interactive instructions with practice demo
         vigour_instructions,
         // Run the main vigour task trials (spread to flatten the array)
         ...createVigourCoreTimeline(settings),
     ];
-    
+
     return vigourTimeline;
 }

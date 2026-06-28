@@ -172,56 +172,58 @@ let fsChangeHandler = null;
 const HOLD_KEYS = ['f', 't', 'h'];
 let vigourResponseKey = 'x'; // set by the handedness prompt (x = left, m = right)
 
-// Module-level handles so listeners can be cleaned up on trial finish,
-// mirroring the fsChangeHandler pattern above.
-let vigourKeyDownHandler = null;
-let vigourKeyUpHandler = null;
+// Physical key state must be tracked continuously, because participants keep the
+// hold keys (F, T, H) down across trials and never re-press them at trial start.
+// A persistent, document-level tracker mirrors the Python task's GetAsyncKeyState
+// approach: keydown/keyup keep `heldKeys` in sync for the whole task, and each
+// trial only swaps in its own response callbacks. (Rebuilding the set per trial
+// left it empty until the OS key-repeat re-fired, causing spurious warnings.)
+const heldKeys = new Set();
+let keyTrackingInstalled = false;
+let activeHoldHandlers = null; // { onValidPress, onHoldViolation } for the current trial
 
-/**
- * Attaches document-level keydown/keyup listeners that track which keys are
- * currently held and report valid response-key taps.
- * @param {Object} handlers
- * @param {Function} handlers.onValidPress - called when the response key is tapped while all hold keys are down
- * @param {Function} [handlers.onHoldViolation] - called when the response key is tapped without all hold keys down
- */
-function attachHoldKeyListeners({ onValidPress, onHoldViolation }) {
-  const heldKeys = new Set();
+/** Installs the persistent key-state tracker once for the whole task. */
+function installKeyStateTracking() {
+  if (keyTrackingInstalled) return;
+  keyTrackingInstalled = true;
 
-  vigourKeyDownHandler = (e) => {
+  document.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     const alreadyHeld = heldKeys.has(key);
     heldKeys.add(key);
 
-    if (key !== vigourResponseKey) return;
+    if (!activeHoldHandlers || key !== vigourResponseKey) return;
     // Ignore OS auto-repeat and a response key that is still held down, so each
     // physical tap counts once (equivalent to allow_held_key: false).
     if (e.repeat || alreadyHeld) return;
 
     if (!HOLD_KEYS.every(k => heldKeys.has(k))) {
-      if (onHoldViolation) onHoldViolation();
+      if (activeHoldHandlers.onHoldViolation) activeHoldHandlers.onHoldViolation();
       return;
     }
-    onValidPress(e);
-  };
+    activeHoldHandlers.onValidPress(e);
+  });
 
-  vigourKeyUpHandler = (e) => {
+  document.addEventListener('keyup', (e) => {
     heldKeys.delete(e.key.toLowerCase());
-  };
-
-  document.addEventListener('keydown', vigourKeyDownHandler);
-  document.addEventListener('keyup', vigourKeyUpHandler);
+  });
 }
 
-/** Removes the held-key listeners attached by attachHoldKeyListeners. */
+/**
+ * Routes response-key taps for the current trial to the given callbacks. The
+ * underlying key-state tracker is shared, so held keys carry over between trials.
+ * @param {Object} handlers
+ * @param {Function} handlers.onValidPress - called when the response key is tapped while all hold keys are down
+ * @param {Function} [handlers.onHoldViolation] - called when the response key is tapped without all hold keys down
+ */
+function attachHoldKeyListeners({ onValidPress, onHoldViolation }) {
+  installKeyStateTracking();
+  activeHoldHandlers = { onValidPress, onHoldViolation };
+}
+
+/** Stops routing taps to the current trial's callbacks (tracker stays installed). */
 function detachHoldKeyListeners() {
-  if (vigourKeyDownHandler) {
-    document.removeEventListener('keydown', vigourKeyDownHandler);
-    vigourKeyDownHandler = null;
-  }
-  if (vigourKeyUpHandler) {
-    document.removeEventListener('keyup', vigourKeyUpHandler);
-    vigourKeyUpHandler = null;
-  }
+  activeHoldHandlers = null;
 }
 
 /**
@@ -239,6 +241,11 @@ function vigourHandednessTrial() {
     `,
     choices: ['Left', 'Right'],
     data: { trialphase: 'vigour_handedness' },
+    on_load: function () {
+      // Start tracking physical key state from the very start of the vigour
+      // task, so F/T/H presses are registered even before the practice demo.
+      installKeyStateTracking();
+    },
     on_finish: function (data) {
       // Button index 0 = Left (X), 1 = Right (M).
       vigourResponseKey = data.response === 1 ? 'm' : 'x';
@@ -247,6 +254,16 @@ function vigourHandednessTrial() {
       data.hold_keys = HOLD_KEYS.join(',');
     }
   };
+}
+
+/** Returns the response-key letter to show participants ('X' or 'M'). */
+function getResponseKeyLabel() {
+  return vigourResponseKey.toUpperCase();
+}
+
+/** Returns the chosen handedness ('left' or 'right'). */
+function getHandednessLabel() {
+  return vigourResponseKey === 'm' ? 'right' : 'left';
 }
 
 /**
@@ -435,16 +452,19 @@ function createVigourCoreTimeline(settings) {
         removePersistentCoinContainer();
     };
 
-    // Ask handedness once up front to set the little-finger response key.
-    experimentTimeline.unshift(vigourHandednessTrial());
-
     return experimentTimeline;
 }
 
 export {
   createVigourCoreTimeline,
-  updatePersistentCoinContainer, 
-  observeResizing, 
+  updatePersistentCoinContainer,
+  observeResizing,
   dropCoin,
-  VIGOUR_PRELOAD_IMAGES
+  VIGOUR_PRELOAD_IMAGES,
+  vigourHandednessTrial,
+  attachHoldKeyListeners,
+  detachHoldKeyListeners,
+  getResponseKeyLabel,
+  getHandednessLabel,
+  HOLD_KEYS
 }
