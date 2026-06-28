@@ -165,6 +165,90 @@ function generateTrialStimulus(magnitude, ratio) {
 let vigourTrialCounter = 0;
 let fsChangeHandler = null;
 
+// --- Held-key response mechanism (matches the Python pupillometry task) ---
+// Participants keep three keys (F, T, H) held down and tap a response key with
+// the little finger: X for left-handers, M for right-handers. A press is only
+// counted when all three hold keys are down at the moment of the tap.
+const HOLD_KEYS = ['f', 't', 'h'];
+let vigourResponseKey = 'x'; // set by the handedness prompt (x = left, m = right)
+
+// Module-level handles so listeners can be cleaned up on trial finish,
+// mirroring the fsChangeHandler pattern above.
+let vigourKeyDownHandler = null;
+let vigourKeyUpHandler = null;
+
+/**
+ * Attaches document-level keydown/keyup listeners that track which keys are
+ * currently held and report valid response-key taps.
+ * @param {Object} handlers
+ * @param {Function} handlers.onValidPress - called when the response key is tapped while all hold keys are down
+ * @param {Function} [handlers.onHoldViolation] - called when the response key is tapped without all hold keys down
+ */
+function attachHoldKeyListeners({ onValidPress, onHoldViolation }) {
+  const heldKeys = new Set();
+
+  vigourKeyDownHandler = (e) => {
+    const key = e.key.toLowerCase();
+    const alreadyHeld = heldKeys.has(key);
+    heldKeys.add(key);
+
+    if (key !== vigourResponseKey) return;
+    // Ignore OS auto-repeat and a response key that is still held down, so each
+    // physical tap counts once (equivalent to allow_held_key: false).
+    if (e.repeat || alreadyHeld) return;
+
+    if (!HOLD_KEYS.every(k => heldKeys.has(k))) {
+      if (onHoldViolation) onHoldViolation();
+      return;
+    }
+    onValidPress(e);
+  };
+
+  vigourKeyUpHandler = (e) => {
+    heldKeys.delete(e.key.toLowerCase());
+  };
+
+  document.addEventListener('keydown', vigourKeyDownHandler);
+  document.addEventListener('keyup', vigourKeyUpHandler);
+}
+
+/** Removes the held-key listeners attached by attachHoldKeyListeners. */
+function detachHoldKeyListeners() {
+  if (vigourKeyDownHandler) {
+    document.removeEventListener('keydown', vigourKeyDownHandler);
+    vigourKeyDownHandler = null;
+  }
+  if (vigourKeyUpHandler) {
+    document.removeEventListener('keyup', vigourKeyUpHandler);
+    vigourKeyUpHandler = null;
+  }
+}
+
+/**
+ * Handedness prompt: a Left/Right button selection that sets the little-finger
+ * response key (X for left hand, M for right hand) used throughout the task.
+ * @returns {Object} jsPsych trial object
+ */
+function vigourHandednessTrial() {
+  return {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+      <div id="instruction-text" style="font-size: 1.2em; line-height: 1.6;">
+        <p>Which hand do you write with?</p>
+      </div>
+    `,
+    choices: ['Left', 'Right'],
+    data: { trialphase: 'vigour_handedness' },
+    on_finish: function (data) {
+      // Button index 0 = Left (X), 1 = Right (M).
+      vigourResponseKey = data.response === 1 ? 'm' : 'x';
+      data.handedness = vigourResponseKey === 'm' ? 'right' : 'left';
+      data.response_key = vigourResponseKey;
+      data.hold_keys = HOLD_KEYS.join(',');
+    }
+  };
+}
+
 /**
  * Creates a single vigour trial with piggy bank shaking mechanics
  * @param {Object} settings - Configuration object containing task parameters
@@ -209,16 +293,19 @@ function piggyBankTrial(settings) {
 
       let lastPressTime = 0;
       let pressCount = 0;
+      let lastHoldWarningTime = 0;
 
       const ratio = jsPsych.evaluateTimelineVariable('ratio');
       const magnitude = jsPsych.evaluateTimelineVariable('magnitude');
+      const listenerStart = performance.now();
 
-      // Set up keyboard listener for vigour responses
-      const keyboardListener = jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: function (info) {
-          trialState.responseTime.push(info.rt - lastPressTime);
-          lastPressTime = info.rt;
-          // wigglePiggy();
+      // Count taps of the little-finger response key, but only while the three
+      // hold keys (F, T, H) are held down. See attachHoldKeyListeners above.
+      attachHoldKeyListeners({
+        onValidPress: function () {
+          const rt = performance.now() - listenerStart;
+          trialState.responseTime.push(rt - lastPressTime);
+          lastPressTime = rt;
           shakePiggy();
           pressCount++;
           trialState.trialPresses++;
@@ -232,11 +319,15 @@ function piggyBankTrial(settings) {
             dropCoin(magnitude, true);
           }
         },
-        valid_responses: ['b'],
-        rt_method: 'performance',
-        persist: true,
-        allow_held_key: false,
-        minimum_valid_rt: 0
+        onHoldViolation: function () {
+          // Faithful to the Python task: ignore the press and remind the
+          // participant to keep the three keys held. Throttled to avoid spam.
+          const now = performance.now();
+          if (now - lastHoldWarningTime > 1500) {
+            lastHoldWarningTime = now;
+            showTemporaryWarning("Keep holding 'F', 'T', and 'H'", 800);
+          }
+        }
       });
     },
     on_load: function () {
@@ -260,17 +351,27 @@ function piggyBankTrial(settings) {
       document.addEventListener('fullscreenchange', fsChangeHandler);
       document.addEventListener('webkitfullscreenchange', fsChangeHandler);
 
-      // Simulate keypresses for testing mode
+      // Simulate keypresses for testing mode: hold the three keys, then tap the
+      // response key. Events are dispatched on document so the held-key
+      // listeners pick them up.
       if (window.simulating) {
         const trial_presses = jsPsych.randomization.randomInt(1, 8);
-        const avg_rt = 500/trial_presses;
+        const avg_rt = 500 / trial_presses;
+        HOLD_KEYS.forEach(k => document.dispatchEvent(new KeyboardEvent('keydown', { key: k })));
         for (let i = 0; i < trial_presses; i++) {
-          jsPsych.pluginAPI.pressKey('b', avg_rt * i + 1);
+          jsPsych.pluginAPI.setTimeout(() => {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: vigourResponseKey }));
+            document.dispatchEvent(new KeyboardEvent('keyup', { key: vigourResponseKey }));
+          }, avg_rt * i + 1);
         }
+        jsPsych.pluginAPI.setTimeout(() => {
+          HOLD_KEYS.forEach(k => document.dispatchEvent(new KeyboardEvent('keyup', { key: k })));
+        }, 500);
       }
     },
     on_finish: function (data) {
-      // Clean up listener
+      // Clean up listeners
+      detachHoldKeyListeners();
       jsPsych.pluginAPI.cancelAllKeyboardResponses();
       vigourTrialCounter += 1;
       data.trial_number = vigourTrialCounter;
@@ -333,7 +434,10 @@ function createVigourCoreTimeline(settings) {
     experimentTimeline.at(-1)["on_timeline_finish"] = () => {
         removePersistentCoinContainer();
     };
-    
+
+    // Ask handedness once up front to set the little-finger response key.
+    experimentTimeline.unshift(vigourHandednessTrial());
+
     return experimentTimeline;
 }
 
