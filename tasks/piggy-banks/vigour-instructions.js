@@ -193,7 +193,7 @@ const startConfirmation = {
     return `
   <div id="instruction-text">
       <p>You will now play the piggy-bank game without a break for about <strong>four minutes</strong>.</p>
-      <p>When you're ready, place your <strong>index, middle and ring fingers</strong> on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys and keep them <strong>held down</strong> throughout the game.</p>
+      <p>When you're ready, place your <strong>${hand} hand's index, middle and ring fingers</strong> on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys and keep them <strong>held down</strong> throughout the game.</p>
       <p>Use the <strong>little finger of your ${hand} hand</strong> to tap the <span class="spacebar-icon">${label}</span> key, as shown below.</p>
       <img src="./assets/images/piggy-banks/vigour_key.png" style="width:250px;" alt="Key press illustration">
       <p>While holding the three keys, tap <span class="spacebar-icon">${label}</span> once to begin.</p>
@@ -216,11 +216,58 @@ const startConfirmation = {
 }
 
 /**
+ * Dedicated screen that explains the hold-and-tap response method before the
+ * demo, introducing the two parts one step at a time. Adapts the tap key and
+ * hand to the participant's handedness.
+ * NOTE: vigour_key.png is a placeholder image (shows the old key) until the new
+ * photo of the keys is added.
+ */
+const holdKeysInstruction = {
+  type: jsPsychInstructions,
+  data: {trialphase: 'vigour_instructions'},
+  show_clickable_nav: true,
+  pages: function () {
+    const label = getResponseKeyLabel();
+    const hand = getHandednessLabel();
+    return [
+      // Step 1: overview
+      `
+  <div id="instruction-text">
+    <p><strong>How to shake a piggy bank</strong></p>
+    <p>You will collect coins by shaking piggy banks.</p>
+    <p>Shaking uses the keyboard in a special way. We'll go through it one step at a time.</p>
+  </div>
+      `,
+      // Step 2: the holding part
+      `
+  <div id="instruction-text">
+    <p><strong>Step 1: hold three keys down</strong></p>
+    <p>Using your <strong>${hand} hand</strong>, place three fingers on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys:</p>
+    <p>your <strong>index, middle and ring fingers</strong>.</p>
+    <p><strong>Hold all three keys down</strong>, and keep holding them the whole time you play.</p>
+    <img src="./assets/images/piggy-banks/vigour_key.png" style="width:220px;" alt="Keys to hold">
+  </div>
+      `,
+      // Step 3: the tapping part
+      `
+  <div id="instruction-text">
+    <p><strong>Step 2: tap to shake</strong></p>
+    <p>While you keep holding <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span>,</p>
+    <p>tap the <span class="spacebar-icon">${label}</span> key with the <strong>little finger of your ${hand} hand</strong>.</p>
+    <p>Each tap gives the piggy bank a shake. The more you tap, the more coins you get!</p>
+    <img src="./assets/images/piggy-banks/vigour_key.png" style="width:220px;" alt="Key to tap">
+  </div>
+      `
+    ];
+  }
+};
+
+/**
  * Main export: Complete vigour task instruction timeline
  * Includes loop functionality to repeat instructions if user presses 'r'
  */
 export const vigour_instructions = {
-  timeline: [instructionPage, ruleInstruction, startConfirmation],
+  timeline: [holdKeysInstruction, instructionPage, ruleInstruction, startConfirmation],
   // Loop function to repeat instructions if user presses 'r'
   loop_function: function (data) {
     const last_iter = data.last(1).values()[0];
@@ -272,9 +319,10 @@ function generateInstructStimulus() {
  */
 function updateInstructionText(shakeCount) {
   const label = getResponseKeyLabel();
+  const hand = getHandednessLabel();
   const holdKeys = `<span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span>`;
   const messages = [
-    `<p>Welcome to the piggy bank game!</p><p>Hold the ${holdKeys} keys down with your index, middle and ring fingers, then tap the <span class="spacebar-icon">${label}</span> key with your little finger to shake this piggy bank!</p>`,
+    `<p>Now try it yourself!</p><p>With your ${hand} hand, hold the ${holdKeys} keys down with your index, middle and ring fingers, then tap the <span class="spacebar-icon">${label}</span> key with your little finger to shake this piggy bank!</p>`,
     `<p>Keep holding ${holdKeys}, and tap <span class="spacebar-icon">${label}</span> with your little finger to shake the piggy bank!</p><p>Keep tapping to shake more...</p>`,
     '<p>Well done, You just got a coin out of the piggy bank!</p><p><span class="highlight-txt">You can always tap again for more coins.</span> Try getting some more!</p>'
   ];
