@@ -103,7 +103,7 @@
         async function runExperiment() {
             try {
                 // Which module to run
-                const module_name = window.module || "living_lab";
+                const module_name = window.module || "screening";
 
                 // Get module information
                 const moduleInfo = getModuleInfo(module_name);
@@ -151,7 +151,7 @@
                 jsPsych.getDisplayElement().innerHTML = `
                     <div style="text-align: center; padding: 50px;">
                         <h2>Error Loading Experiment</h2>
-                        <p>There was an error loading module <strong>${window.module || "living_lab"}</strong>:</p>
+                        <p>There was an error loading module <strong>${window.module || "screening"}</strong>:</p>
                         <p><strong>${error.message}</strong></p>
                         <p>Please check the console for more details.</p>
                     </div>
