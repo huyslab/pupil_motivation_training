@@ -2,12 +2,64 @@
 import { postToParent, saveDataREDCap, updateBonusState, updateState, showTemporaryWarning, kickOut, fullscreen_prompt } from '@utils/index.js';
 import { shakePiggy, updatePiggyTails} from "./utils.js";
 
-// Trial sequence for vigour task - each trial specifies piggy properties and duration
-const VIGOUR_TRIALS = [{ "magnitude": 1, "ratio": 1, "trialDuration": 6825 }, { "magnitude": 2, "ratio": 8, "trialDuration": 6956 }, { "magnitude": 1, "ratio": 16, "trialDuration": 7228 }, { "magnitude": 5, "ratio": 1, "trialDuration": 7221 }, { "magnitude": 5, "ratio": 16, "trialDuration": 7261 }, { "magnitude": 2, "ratio": 1, "trialDuration": 7386 }, { "magnitude": 1, "ratio": 8, "trialDuration": 7009 }, { "magnitude": 5, "ratio": 8, "trialDuration": 7376 }, { "magnitude": 2, "ratio": 16, "trialDuration": 6666 }, { "magnitude": 1, "ratio": 1, "trialDuration": 6962 }, { "magnitude": 2, "ratio": 8, "trialDuration": 6501 }, { "magnitude": 2, "ratio": 1, "trialDuration": 7236 }, { "magnitude": 5, "ratio": 1, "trialDuration": 7490 }, { "magnitude": 1, "ratio": 16, "trialDuration": 6902 }, { "magnitude": 1, "ratio": 8, "trialDuration": 6888 }, { "magnitude": 2, "ratio": 16, "trialDuration": 6891 }, { "magnitude": 5, "ratio": 8, "trialDuration": 6535 }, { "magnitude": 5, "ratio": 16, "trialDuration": 6652 }, { "magnitude": 1, "ratio": 8, "trialDuration": 6890 }, { "magnitude": 5, "ratio": 8, "trialDuration": 7452 }, { "magnitude": 5, "ratio": 16, "trialDuration": 6954 }, { "magnitude": 2, "ratio": 1, "trialDuration": 6827 }, { "magnitude": 5, "ratio": 1, "trialDuration": 6679 }, { "magnitude": 1, "ratio": 16, "trialDuration": 7199 }, { "magnitude": 2, "ratio": 16, "trialDuration": 7207 }, { "magnitude": 1, "ratio": 1, "trialDuration": 7145 }, { "magnitude": 2, "ratio": 8, "trialDuration": 7465 }, { "magnitude": 1, "ratio": 8, "trialDuration": 6870 }, { "magnitude": 5, "ratio": 8, "trialDuration": 6726 }, { "magnitude": 2, "ratio": 16, "trialDuration": 6688 }, { "magnitude": 2, "ratio": 8, "trialDuration": 6506 }, { "magnitude": 5, "ratio": 1, "trialDuration": 7044 }, { "magnitude": 2, "ratio": 1, "trialDuration": 7293 }, { "magnitude": 1, "ratio": 1, "trialDuration": 7182 }, { "magnitude": 1, "ratio": 16, "trialDuration": 6862 }, { "magnitude": 5, "ratio": 16, "trialDuration": 6985 }];
+// Reward/effort conditions: a full factorial of magnitude x fixed-ratio (FR).
+// magnitude is the coin value (pence); ratio is the fixed ratio (presses per reward).
+// 2 magnitudes x 3 ratios = 6 conditions.
+const VIGOUR_MAGNITUDES = [1, 5];
+const VIGOUR_RATIOS = [1, 5, 10];
+const VIGOUR_CONDITIONS = VIGOUR_MAGNITUDES.flatMap(
+  magnitude => VIGOUR_RATIOS.map(ratio => ({ magnitude, ratio }))
+);
+
+// Click-phase duration is sampled uniformly within this range (ms) per trial,
+// freshly per participant (not frozen), matching the Python uniform(4.0, 6.0) s.
+const VIGOUR_TRIAL_DURATION_RANGE_MS = [4000, 6000];
+
+// Default number of blocks; one trial per condition per block. Overridable via
+// the `n_blocks` task-registry option.
+const VIGOUR_DEFAULT_N_BLOCKS = 3;
+
+// Totals for periodic data saving, set when the timeline is built.
+let vigourTotalTrials = 0;
+let vigourSaveInterval = 1;
 
 // Extract unique piggy bank parameters for UI configuration
-const magnitudes = [...new Set(VIGOUR_TRIALS.map(trial => trial.magnitude))].sort((a, b) => a - b);
-const ratios = [...new Set(VIGOUR_TRIALS.map(trial => trial.ratio))].sort((a, b) => b - a);
+const magnitudes = [...new Set(VIGOUR_CONDITIONS.map(c => c.magnitude))].sort((a, b) => a - b);
+const ratios = [...new Set(VIGOUR_CONDITIONS.map(c => c.ratio))].sort((a, b) => b - a);
+
+/**
+ * Builds the full trial list: in each block the five conditions appear once in a
+ * fresh random order, each with an independently sampled click duration. The
+ * randomisation and durations are drawn at build time, so they differ per
+ * participant rather than being frozen.
+ * @param {number} nBlocks - number of blocks (one trial per condition per block)
+ * @returns {Array<Object>} trial list with magnitude, ratio, trialDuration, block
+ */
+function buildVigourTrials(nBlocks) {
+  const [minMs, maxMs] = VIGOUR_TRIAL_DURATION_RANGE_MS;
+  const sampleDuration = () => Math.round(minMs + Math.random() * (maxMs - minMs));
+  const shuffle = (arr) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const trials = [];
+  for (let block = 1; block <= nBlocks; block++) {
+    shuffle(VIGOUR_CONDITIONS).forEach(cond => {
+      trials.push({
+        magnitude: cond.magnitude,
+        ratio: cond.ratio,
+        trialDuration: sampleDuration(),
+        block: block
+      });
+    });
+  }
+  return trials;
+}
 
 // Global task state tracking variables
 let taskTotalReward = 0;
@@ -280,7 +332,7 @@ function piggyBankTrial(settings) {
     choices: 'NO_KEYS',
     // response_ends_trial: false,
     trial_duration: jsPsych.timelineVariable('trialDuration'),
-    save_timeline_variables: ["magnitude", "ratio"],
+    save_timeline_variables: ["magnitude", "ratio", "block"],
     data: {
       trialphase: 'vigour_trial',
       trial_duration: jsPsych.timelineVariable('trialDuration'),
@@ -394,7 +446,7 @@ function piggyBankTrial(settings) {
       data.trial_number = vigourTrialCounter;
       
       // Save data at regular intervals and end of task
-      if (vigourTrialCounter % (VIGOUR_TRIALS.length / 3) == 0 || vigourTrialCounter == VIGOUR_TRIALS.length) {
+      if ((vigourSaveInterval > 0 && vigourTrialCounter % vigourSaveInterval === 0) || vigourTrialCounter === vigourTotalTrials) {
         saveDataREDCap(3);
         updateBonusState(settings);
       }
@@ -429,10 +481,19 @@ function piggyBankTrial(settings) {
  */
 function createVigourCoreTimeline(settings) {
     let experimentTimeline = [];
+
+    // Number of blocks is configurable; one trial per condition per block.
+    const nBlocks = (settings && Number.isInteger(settings.n_blocks) && settings.n_blocks > 0)
+        ? settings.n_blocks
+        : VIGOUR_DEFAULT_N_BLOCKS;
+    const trials = buildVigourTrials(nBlocks);
+    vigourTotalTrials = trials.length;
+    vigourSaveInterval = Math.max(1, Math.round(vigourTotalTrials / 3));
+
     // Create a timeline for each trial with kick-out and fullscreen checks
-    VIGOUR_TRIALS.forEach(trial => {
+    trials.forEach(trial => {
         experimentTimeline.push({
-            timeline: [kickOut(settings), fullscreen_prompt, piggyBankTrial(settings)], 
+            timeline: [kickOut(settings), fullscreen_prompt, piggyBankTrial(settings)],
             timeline_variables: [trial]
         });
     });

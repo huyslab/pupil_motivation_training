@@ -230,9 +230,11 @@ export const TaskRegistry = {
     computeBonus: () => computeRelativePiggyTasksBonus('vigour_trial'), 
     defaultConfig: {
       task_name: "vigour",
+      n_blocks: 15,
     },
     configOptions: {
-      task_name: "The name of the task as it would appear in the bonus object. Default is 'vigour'."
+      task_name: "The name of the task as it would appear in the bonus object. Default is 'vigour'.",
+      n_blocks: "Number of blocks. Each block has one trial per reward/effort condition (5 conditions), in a fresh random order. Default is 15."
     },
     requirements: {
       css: ['@tasks/piggy-banks/styles.css'],

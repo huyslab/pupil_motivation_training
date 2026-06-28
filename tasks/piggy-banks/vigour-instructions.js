@@ -165,10 +165,6 @@ const ruleInstruction = {
             <p>1 Penny</p>
         </div>
         <div class="instruct-coin">
-            <img src="./assets/images/piggy-banks/2p-num.png" alt="2 Pence">
-            <p>2 Pence</p>
-        </div>
-        <div class="instruct-coin">
             <img src="./assets/images/piggy-banks/5p-num.png" alt="5 Pence">
             <p>5 Pence</p>
         </div>
