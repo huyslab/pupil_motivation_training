@@ -143,7 +143,7 @@ function saveDataREDCap(retry = 1, extra_fields = {}, callback = () => {}) {
     }])
 
     // Submit data via AWS Lambda endpoint 
-    fetch('https://4csc8jmaw2.execute-api.eu-north-1.amazonaws.com/Prod/livinglab', {
+    fetch('https://4csc8jmaw2.execute-api.eu-north-1.amazonaws.com/Prod/motivationpupil', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
