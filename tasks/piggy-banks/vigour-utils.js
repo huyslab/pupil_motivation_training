@@ -131,7 +131,26 @@ function getVigourCueMapping() {
   const seed = vigourParticipantSeed(participantId);
   const { mapping, row, cycle } = vigourLatinSquareMapping(seed);
   vigourCueMappingCache = { participantId, seed, mapping, row, cycle };
+  logVigourCueMapping(vigourCueMappingCache);
   return vigourCueMappingCache;
+}
+
+/** Prints the determined condition -> cue-sound mapping to the console (once). */
+function logVigourCueMapping({ participantId, seed, mapping, row, cycle }) {
+  const table = VIGOUR_CONDITIONS.map((cond, conditionIndex) => {
+    const identity = mapping[conditionIndex];
+    return {
+      condition: `${cond.magnitude}p / FR${cond.ratio}`,
+      cue_identity: identity,
+      cue: VIGOUR_CUE_IDENTITIES[identity].label,
+      file_prefix: VIGOUR_CUE_IDENTITIES[identity].prefix,
+    };
+  });
+  console.log(
+    `[vigour] cue mapping determined - participant ${participantId} ` +
+    `(seed ${seed}, Latin-square row ${row}, cycle ${cycle}):`
+  );
+  console.table(table);
 }
 
 /**
@@ -763,5 +782,6 @@ export {
   resolveVigourNBlocks,
   playVigourCueLoop,
   stopVigourCue,
-  vigourCalibrationCueFile
+  vigourCalibrationCueFile,
+  getVigourCueMapping
 }

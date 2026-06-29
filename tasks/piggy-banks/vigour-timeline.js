@@ -1,4 +1,4 @@
-import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial, vigourCuePreloadAudio, resolveVigourNBlocks } from './vigour-utils.js';
+import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial, vigourCuePreloadAudio, resolveVigourNBlocks, getVigourCueMapping } from './vigour-utils.js';
 import { vigour_instructions, headphoneInstruction } from './vigour-instructions.js';
 import { createPreloadTrial } from '../../core/utils/index.js';
 
@@ -8,6 +8,9 @@ import { createPreloadTrial } from '../../core/utils/index.js';
  * @returns {Array} Array of jsPsych timeline objects for the vigour task
  */
 export function createVigourTimeline(settings) {
+    // Determine (and log) the participant's cue -> piggy-bank mapping at load time.
+    getVigourCueMapping();
+
     const vigourTimeline = [
         // Preload all images and cue sounds required for the vigour task
         createPreloadTrial(
