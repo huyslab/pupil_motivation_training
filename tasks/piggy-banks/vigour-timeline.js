@@ -1,5 +1,5 @@
 import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial, vigourCuePreloadAudio, resolveVigourNBlocks, getVigourCueMapping } from './vigour-utils.js';
-import { vigour_instructions, headphoneInstruction } from './vigour-instructions.js';
+import { vigour_instructions, headphoneInstruction, vigour_end_message } from './vigour-instructions.js';
 import { createPreloadTrial } from '../../core/utils/index.js';
 
 /**
@@ -28,6 +28,8 @@ export function createVigourTimeline(settings) {
         vigour_instructions,
         // Run the main vigour task trials (spread to flatten the array)
         ...createVigourCoreTimeline(settings),
+        // Closing message: the lab task is similar and pays a coin-based bonus.
+        vigour_end_message,
     ];
 
     return vigourTimeline;

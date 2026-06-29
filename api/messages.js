@@ -68,10 +68,10 @@ export const messages = {
     },
     screening: {
         start_message: [
-            `<p><b>Welcome to the first PRIMD training session!</b></p>
-            <p>Over the next twenty minutes, you will try out the main tasks comprising the home assessments in the PRIMD study.
-            <p>You will start by playing a few simple trial-and-error learning games. Your goal in each game is to win as many coins as possible.</p>
-            <p>The games may feel a bit fast-paced because we're interested in your quick, intuitive decisions. Since they're designed around learning from experience, making mistakes is completely expected. Over time, you'll figure out better choices and improve your performance.</p>
+            `<p><b>Welcome!</b></p>
+            <p>This is a short training session to prepare you for the lab experiment you will take part in.</p>
+            <p>You will practise a game that is similar to one of the tasks you will play in the lab. Your goal is to win as many coins as possible.</p>
+            <p>The game may feel a bit fast-paced because we're interested in your quick, intuitive responses. It is designed around learning from experience, so making mistakes is completely expected, and it is fine to take a little while to get the hang of it.</p>
             `,
             `
             <p>If at some point you are taking too long to respond, you might see a message like this:</p><br>

@@ -237,10 +237,26 @@ const ruleInstruction = {
             <p>5 Pence</p>
         </div>
     </div>
-    
-    <p><span class="highlight-txt">Your bonus</span>: At the end of the game, we will pay you a proportion of the total amount of coins collected across all the piggy banks.</p>
     </div>
       `]
+};
+
+/**
+ * End-of-task message: the lab task will be similar, and there the participant
+ * will be paid a bonus according to how many coins they win.
+ */
+export const vigour_end_message = {
+  type: jsPsychInstructions,
+  data: { trialphase: 'vigour_end_message' },
+  show_clickable_nav: true,
+  pages: [`
+  <div id="instruction-text" style="text-align: left">
+    <p><strong>Well done &mdash; that's the end of the piggy-bank game.</strong></p>
+    <p>The task you will play in the lab will be <span class="highlight-txt">similar</span> to this one.</p>
+    <p>There, you will be paid a <span class="highlight-txt">bonus according to how many coins you win</span>, so the practice you have done here will help.</p>
+    <p>See you in the lab!</p>
+  </div>
+  `]
 };
 
 /**
