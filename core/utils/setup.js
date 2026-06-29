@@ -135,15 +135,17 @@ async function loadCSS(cssPath) {
 }
 
 /**
- * Creates a jsPsych preload trial for loading images before task execution
+ * Creates a jsPsych preload trial for loading media before task execution
  * @param {string[]} images - Array of image file paths to preload
  * @param {string} task_name - Name of the task for trial identification
+ * @param {string[]} [audio] - Optional array of audio file paths to preload
  * @returns {Object} jsPsych preload trial configuration object
  */
-function createPreloadTrial(images, task_name) {
+function createPreloadTrial(images, task_name, audio = []) {
     return {
         type: jsPsychPreload,
         images: images,
+        audio: audio,
         post_trial_gap: 800,
         data: {
             trialphase: `${task_name}_preload`,

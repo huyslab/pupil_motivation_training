@@ -19,6 +19,13 @@ const VIGOUR_TRIAL_DURATION_RANGE_MS = [4000, 6000];
 // the `n_blocks` task-registry option.
 const VIGOUR_DEFAULT_N_BLOCKS = 3;
 
+/** Resolves the configured number of blocks, falling back to the default. */
+function resolveVigourNBlocks(settings) {
+  return (settings && Number.isInteger(settings.n_blocks) && settings.n_blocks > 0)
+    ? settings.n_blocks
+    : VIGOUR_DEFAULT_N_BLOCKS;
+}
+
 // Totals for periodic data saving, set when the timeline is built.
 let vigourTotalTrials = 0;
 let vigourSaveInterval = 1;
@@ -26,6 +33,186 @@ let vigourSaveInterval = 1;
 // Extract unique piggy bank parameters for UI configuration
 const magnitudes = [...new Set(VIGOUR_CONDITIONS.map(c => c.magnitude))].sort((a, b) => a - b);
 const ratios = [...new Set(VIGOUR_CONDITIONS.map(c => c.ratio))].sort((a, b) => b - a);
+
+// --- Auditory cue sounds (parity with the Python pilot5_0.py task) ---
+// Each reward x effort condition gets one of six cue sounds, which plays
+// throughout the piggy-bank presentation. Cues are assigned to conditions by a
+// Latin square keyed on the participant number, using the exact same logic as the
+// Python task (make_latin_square_cue_mapping), so the same participant hears the
+// same cue for the same condition in both versions.
+const VIGOUR_CUE_AUDIO_DIR = "./assets/images/piggy-banks/audio/";
+const VIGOUR_N_CUE_IDENTITIES = 6;
+// cue identity (1-6) -> { prefix used in the audio filename, human-readable label }.
+// Mirrors CUE_IDENTITY_LABELS / CUE_IDENTITY_FILE_LABELS in pilot5_0.py (note the
+// "luandry" spelling is intentional - it matches the source audio filenames).
+const VIGOUR_CUE_IDENTITIES = {
+  1: { prefix: "1bird", label: "Bird" },
+  2: { prefix: "2bubble", label: "Bubble" },
+  3: { prefix: "3fire", label: "Fire" },
+  4: { prefix: "4luandry", label: "Laundry" },
+  5: { prefix: "5writing", label: "Writing" },
+  6: { prefix: "6typing", label: "Typing" },
+};
+// The Python task rotates through one cue audio version per block (v01..v12). JS
+// blocks are 1-indexed, so block N uses version ((N - 1) % 12) + 1.
+const VIGOUR_CUE_BLOCK_VERSIONS = 12;
+
+/** Two-digit zero-padded version tag, e.g. 3 -> "v03". */
+function vigourCueVersionTag(version) {
+  return "v" + String(version).padStart(2, "0");
+}
+
+/** Audio file path for a given cue identity (1-6) and version. */
+function vigourCueFile(cueIdentity, version) {
+  const { prefix } = VIGOUR_CUE_IDENTITIES[cueIdentity];
+  return `${VIGOUR_CUE_AUDIO_DIR}${prefix}_${vigourCueVersionTag(version)}.mp3`;
+}
+
+/** Cue audio version used in a given (1-indexed) block. */
+function vigourCueVersionForBlock(block) {
+  return ((block - 1) % VIGOUR_CUE_BLOCK_VERSIONS) + 1;
+}
+
+/**
+ * conditionIndex (0-5) for a magnitude/ratio pair. The ordering is magnitude-major
+ * with ratios in ascending order, matching both VIGOUR_CONDITIONS (built via
+ * flatMap above) and the Python conditionSpecs list, so a given (mag, FR) maps to
+ * the same conditionIndex in both versions.
+ */
+function vigourConditionIndex(magnitude, ratio) {
+  const magIndex = VIGOUR_MAGNITUDES.indexOf(magnitude);
+  const ratioIndex = VIGOUR_RATIOS.indexOf(ratio);
+  return magIndex * VIGOUR_RATIOS.length + ratioIndex;
+}
+
+/**
+ * Reproduces the Python participant -> seed derivation: a string that is a clean
+ * integer is used as that integer; otherwise the sum of character codes is used
+ * (matching Python's int() with a sum(ord(ch)) fallback).
+ * @param {string|number} participantId
+ * @returns {number}
+ */
+function vigourParticipantSeed(participantId) {
+  const s = String(participantId == null ? "" : participantId);
+  const trimmed = s.trim();
+  if (/^[+-]?\d+$/.test(trimmed)) {
+    return parseInt(trimmed, 10);
+  }
+  let sum = 0;
+  for (const ch of s) sum += ch.codePointAt(0);
+  return sum;
+}
+
+/**
+ * Latin-square assignment of cue identities to conditions, identical to
+ * make_latin_square_cue_mapping in pilot5_0.py: with row = (seed - 1) % 6, the cue
+ * identity for condition c is ((c + row) % 6) + 1.
+ * @param {number} participantNumber
+ * @param {number} nConditions
+ * @returns {{ mapping: Object, row: number, cycle: number }}
+ */
+function vigourLatinSquareMapping(participantNumber, nConditions = VIGOUR_N_CUE_IDENTITIES) {
+  const row = (((participantNumber - 1) % nConditions) + nConditions) % nConditions;
+  const cycle = Math.floor((participantNumber - 1) / nConditions);
+  const mapping = {};
+  for (let c = 0; c < nConditions; c++) {
+    mapping[c] = ((c + row) % nConditions) + 1;
+  }
+  return { mapping, row: row + 1, cycle: cycle + 1 };
+}
+
+// Cached per-participant cue mapping (computed once from window.participantID).
+let vigourCueMappingCache = null;
+
+/** Returns (and lazily computes) this participant's cue mapping and seed info. */
+function getVigourCueMapping() {
+  if (vigourCueMappingCache) return vigourCueMappingCache;
+  const participantId = (typeof window !== "undefined" && window.participantID) ? window.participantID : "0";
+  const seed = vigourParticipantSeed(participantId);
+  const { mapping, row, cycle } = vigourLatinSquareMapping(seed);
+  vigourCueMappingCache = { participantId, seed, mapping, row, cycle };
+  return vigourCueMappingCache;
+}
+
+/**
+ * Cue info for a trial, given its condition (magnitude, ratio) and block.
+ * @returns {{ conditionIndex: number, identity: number, label: string, version: number, file: string }}
+ */
+function vigourTrialCue(magnitude, ratio, block) {
+  const { mapping } = getVigourCueMapping();
+  const conditionIndex = vigourConditionIndex(magnitude, ratio);
+  const identity = mapping[conditionIndex];
+  const version = vigourCueVersionForBlock(block);
+  return {
+    conditionIndex,
+    identity,
+    label: VIGOUR_CUE_IDENTITIES[identity].label,
+    version,
+    file: vigourCueFile(identity, version),
+  };
+}
+
+/**
+ * Every participant uses all six cue identities (the Latin square is a cyclic
+ * permutation), so the set of audio files to preload is just each identity at each
+ * block's version, independent of participant.
+ * @param {number} nBlocks
+ * @returns {string[]} de-duplicated list of audio file paths
+ */
+function vigourCuePreloadAudio(nBlocks) {
+  const files = [];
+  for (let identity = 1; identity <= VIGOUR_N_CUE_IDENTITIES; identity++) {
+    for (let block = 1; block <= nBlocks; block++) {
+      files.push(vigourCueFile(identity, vigourCueVersionForBlock(block)));
+    }
+  }
+  return [...new Set(files)];
+}
+
+// --- Cue audio playback ---
+// Plain HTMLAudioElements (the files are preloaded, so playback is gapless). One
+// cue plays per trial and is stopped when the trial ends; cue files are longer
+// than a trial, so they play once without looping (matching the Python task, which
+// plays the cue until the click window ends).
+const vigourAudioCache = new Map();
+let vigourCurrentCueAudio = null;
+// Cue file for the current trial, set in on_start and played in on_load.
+let vigourActiveCueFile = null;
+
+/** Returns a cached HTMLAudioElement for a file, creating it on first use. */
+function getVigourCueAudio(file) {
+  let audio = vigourAudioCache.get(file);
+  if (!audio) {
+    audio = new Audio(file);
+    audio.preload = "auto";
+    vigourAudioCache.set(file, audio);
+  }
+  return audio;
+}
+
+/** Starts a cue sound from the beginning, stopping any cue already playing. */
+function playVigourCue(file) {
+  stopVigourCue();
+  const audio = getVigourCueAudio(file);
+  audio.currentTime = 0;
+  audio.volume = 1.0;
+  const playPromise = audio.play();
+  // Browsers reject play() if there hasn't been a user gesture yet; the task is
+  // always entered via button clicks, but guard anyway so a rejection is silent.
+  if (playPromise && typeof playPromise.catch === "function") {
+    playPromise.catch(() => {});
+  }
+  vigourCurrentCueAudio = audio;
+}
+
+/** Stops and rewinds the currently playing cue sound, if any. */
+function stopVigourCue() {
+  if (vigourCurrentCueAudio) {
+    vigourCurrentCueAudio.pause();
+    vigourCurrentCueAudio.currentTime = 0;
+    vigourCurrentCueAudio = null;
+  }
+}
 
 /**
  * Builds the full trial list: in each block the five conditions appear once in a
@@ -366,7 +553,19 @@ function piggyBankTrial(settings) {
 
       const ratio = jsPsych.evaluateTimelineVariable('ratio');
       const magnitude = jsPsych.evaluateTimelineVariable('magnitude');
+      const block = jsPsych.evaluateTimelineVariable('block');
       const listenerStart = performance.now();
+
+      // Resolve this trial's auditory cue (Latin-square mapping) and record it.
+      // The cue is started in on_load (once the piggy bank is on screen) and
+      // stopped in on_finish.
+      const cue = vigourTrialCue(magnitude, ratio, block);
+      trial.data.condition_index = cue.conditionIndex;
+      trial.data.cue_identity = cue.identity;
+      trial.data.cue_label = cue.label;
+      trial.data.cue_version = cue.version;
+      trial.data.cue_file = cue.file;
+      vigourActiveCueFile = cue.file;
 
       // Count taps of the little-finger response key, but only while the three
       // hold keys (F, T, H) are held down. See attachHoldKeyListeners above.
@@ -411,6 +610,12 @@ function piggyBankTrial(settings) {
       updatePersistentCoinContainer(); // Update the persistent coin container
       observeResizing('coin-container', updatePersistentCoinContainer);
 
+      // Start the auditory cue now that the piggy bank is on screen. It plays
+      // until the trial ends (stopped in on_finish).
+      if (vigourActiveCueFile) {
+        playVigourCue(vigourActiveCueFile);
+      }
+
       // Add fullscreen change listener to re-update piggy tails
       fsChangeHandler = () => {
         if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -439,6 +644,9 @@ function piggyBankTrial(settings) {
       }
     },
     on_finish: function (data) {
+      // Stop the cue sound (the piggy bank presentation has ended).
+      stopVigourCue();
+      vigourActiveCueFile = null;
       // Clean up listeners
       detachHoldKeyListeners();
       jsPsych.pluginAPI.cancelAllKeyboardResponses();
@@ -483,9 +691,7 @@ function createVigourCoreTimeline(settings) {
     let experimentTimeline = [];
 
     // Number of blocks is configurable; one trial per condition per block.
-    const nBlocks = (settings && Number.isInteger(settings.n_blocks) && settings.n_blocks > 0)
-        ? settings.n_blocks
-        : VIGOUR_DEFAULT_N_BLOCKS;
+    const nBlocks = resolveVigourNBlocks(settings);
     const trials = buildVigourTrials(nBlocks);
     vigourTotalTrials = trials.length;
     vigourSaveInterval = Math.max(1, Math.round(vigourTotalTrials / 3));
@@ -506,10 +712,21 @@ function createVigourCoreTimeline(settings) {
         // Reset task counters
         taskTotalReward = 0;
         taskTotalPresses = 0;
+        // Record the participant's cue assignment (Latin square) once, so the
+        // condition -> cue-identity mapping is recoverable from the data.
+        const cueMapping = getVigourCueMapping();
+        jsPsych.data.addProperties({
+            vigour_cue_assignment: "latin_square",
+            vigour_participant_seed: cueMapping.seed,
+            vigour_latin_square_row: cueMapping.row,
+            vigour_latin_square_cycle: cueMapping.cycle,
+            vigour_condition_to_cue_identity: JSON.stringify(cueMapping.mapping),
+        });
     };
 
     // Add cleanup callback to last trial
     experimentTimeline.at(-1)["on_timeline_finish"] = () => {
+        stopVigourCue();
         removePersistentCoinContainer();
     };
 
@@ -527,5 +744,7 @@ export {
   detachHoldKeyListeners,
   getResponseKeyLabel,
   getHandednessLabel,
-  HOLD_KEYS
+  HOLD_KEYS,
+  vigourCuePreloadAudio,
+  resolveVigourNBlocks
 }

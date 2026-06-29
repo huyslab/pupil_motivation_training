@@ -1,4 +1,4 @@
-import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial } from './vigour-utils.js';
+import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial, vigourCuePreloadAudio, resolveVigourNBlocks } from './vigour-utils.js';
 import { vigour_instructions } from './vigour-instructions.js';
 import { createPreloadTrial } from '../../core/utils/index.js';
 
@@ -9,8 +9,12 @@ import { createPreloadTrial } from '../../core/utils/index.js';
  */
 export function createVigourTimeline(settings) {
     const vigourTimeline = [
-        // Preload all images required for the vigour task
-        createPreloadTrial(VIGOUR_PRELOAD_IMAGES, settings.task_name),
+        // Preload all images and cue sounds required for the vigour task
+        createPreloadTrial(
+            VIGOUR_PRELOAD_IMAGES,
+            settings.task_name,
+            vigourCuePreloadAudio(resolveVigourNBlocks(settings))
+        ),
         // Ask handedness up front so all instructions and trials use the
         // correct little-finger response key (X for left, M for right).
         vigourHandednessTrial(),
