@@ -1,6 +1,74 @@
-import { updatePersistentCoinContainer, observeResizing, dropCoin, attachHoldKeyListeners, detachHoldKeyListeners, getResponseKeyLabel, getHandednessLabel } from './vigour-utils.js';
+import { updatePersistentCoinContainer, observeResizing, dropCoin, attachHoldKeyListeners, detachHoldKeyListeners, getResponseKeyLabel, getHandednessLabel, playVigourCueLoop, stopVigourCue, vigourCalibrationCueFile } from './vigour-utils.js';
 import { shakePiggy } from './utils.js';
 import { updateState, showTemporaryWarning } from '@utils/index.js';
+
+/**
+ * General "put your headphones on" screen, shown early (before the task has been
+ * explained). Deliberately makes no mention of piggy banks or the sounds - that
+ * comes later, once the participant knows what a piggy bank is.
+ */
+export const headphoneInstruction = {
+  type: jsPsychInstructions,
+  data: { trialphase: 'vigour_headphone_instructions' },
+  show_clickable_nav: true,
+  pages: [`
+  <div id="instruction-text" style="text-align: left">
+    <p style="text-align:center; font-size:3em; margin:0">🎧</p>
+    <p><strong>Please put your headphones on now.</strong></p>
+    <p>You will need them for sounds later in the game, so keep them on for the rest of the study.</p>
+    <p>Make sure they are on and working before you continue.</p>
+  </div>
+  `]
+};
+
+/**
+ * Explains, right before the task starts, that each piggy bank has its own sound
+ * and why it matters: in the lab the piggy banks will be hidden and identified
+ * only by sound. Wording mirrors the Python task's cue intro (pilot5_0.py), so
+ * the two versions tell participants the same thing. Shown after the task
+ * mechanics so "piggy bank" is already meaningful.
+ */
+const soundMemoryInstruction = {
+  type: jsPsychInstructions,
+  data: { trialphase: 'vigour_sound_instructions' },
+  show_clickable_nav: true,
+  pages: [`
+  <div id="instruction-text" style="text-align: left">
+    <p style="text-align:center; font-size:3em; margin:0">🔊</p>
+    <p><strong>One more thing: the piggy banks make sounds.</strong></p>
+    <p>As you play, each piggy bank plays its own <span class="highlight-txt">sound</span> while you shake it.</p>
+    <p>Listen carefully and try to learn them. When you come to the lab, the piggy banks will no longer be shown on screen &mdash; instead, each piggy bank will be <span class="highlight-txt">identified only by its sound</span>, and you will be tested on recognising them.</p>
+    <p>Make sure your headphones are still on.</p>
+  </div>
+  `]
+};
+
+/**
+ * Volume-calibration screen. One cue sound plays continuously (looping) at the
+ * same level it will play during the task, so the participant can set their
+ * device volume to a comfortable level before starting.
+ */
+const volumeCalibration = {
+  type: jsPsychHtmlButtonResponse,
+  data: { trialphase: 'vigour_volume_calibration' },
+  choices: ['Continue'],
+  stimulus: `
+  <div id="instruction-text" style="text-align: left">
+    <p style="text-align:center; font-size:3em; margin:0">🔊</p>
+    <p><strong>Let's set the volume.</strong></p>
+    <p>One of the piggy-bank sounds is playing now, on a loop.</p>
+    <p>Adjust your computer's volume until it is at a <span class="highlight-txt">comfortable level</span> — clear, but not too loud.</p>
+    <p>When it sounds right, click <strong>Continue</strong> to carry on.</p>
+  </div>
+  `,
+  on_load: function () {
+    // Play the calibration cue on a loop at full (task) volume.
+    playVigourCueLoop(vigourCalibrationCueFile());
+  },
+  on_finish: function () {
+    stopVigourCue();
+  }
+};
 
 /**
  * Interactive instruction page that demonstrates the piggy bank shaking mechanism
@@ -263,7 +331,7 @@ const holdKeysInstruction = {
  * Includes loop functionality to repeat instructions if user presses 'r'
  */
 export const vigour_instructions = {
-  timeline: [holdKeysInstruction, instructionPage, ruleInstruction, startConfirmation],
+  timeline: [holdKeysInstruction, instructionPage, ruleInstruction, soundMemoryInstruction, volumeCalibration, startConfirmation],
   // Loop function to repeat instructions if user presses 'r'
   loop_function: function (data) {
     const last_iter = data.last(1).values()[0];

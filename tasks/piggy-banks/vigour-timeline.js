@@ -1,5 +1,5 @@
 import { createVigourCoreTimeline, VIGOUR_PRELOAD_IMAGES, vigourHandednessTrial, vigourCuePreloadAudio, resolveVigourNBlocks } from './vigour-utils.js';
-import { vigour_instructions } from './vigour-instructions.js';
+import { vigour_instructions, headphoneInstruction } from './vigour-instructions.js';
 import { createPreloadTrial } from '../../core/utils/index.js';
 
 /**
@@ -18,7 +18,10 @@ export function createVigourTimeline(settings) {
         // Ask handedness up front so all instructions and trials use the
         // correct little-finger response key (X for left, M for right).
         vigourHandednessTrial(),
-        // Show interactive instructions with practice demo
+        // General "put your headphones on" reminder, before the task is explained.
+        headphoneInstruction,
+        // Interactive instructions; these end with the piggy-bank sound message
+        // and volume calibration, right before the task begins.
         vigour_instructions,
         // Run the main vigour task trials (spread to flatten the array)
         ...createVigourCoreTimeline(settings),

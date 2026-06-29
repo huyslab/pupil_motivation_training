@@ -190,12 +190,15 @@ function getVigourCueAudio(file) {
   return audio;
 }
 
-/** Starts a cue sound from the beginning, stopping any cue already playing. */
-function playVigourCue(file) {
+/** Starts a cue sound, stopping any cue already playing. Set loop for calibration. */
+function playVigourCue(file, loop = false) {
   stopVigourCue();
   const audio = getVigourCueAudio(file);
   audio.currentTime = 0;
   audio.volume = 1.0;
+  // Cached elements are reused, so always set loop explicitly (a calibration play
+  // leaves loop = true on the element, which must not carry into a trial).
+  audio.loop = loop;
   const playPromise = audio.play();
   // Browsers reject play() if there hasn't been a user gesture yet; the task is
   // always entered via button clicks, but guard anyway so a rejection is silent.
@@ -205,13 +208,24 @@ function playVigourCue(file) {
   vigourCurrentCueAudio = audio;
 }
 
+/** Plays a cue sound on a continuous loop (used by the volume-calibration trial). */
+function playVigourCueLoop(file) {
+  playVigourCue(file, true);
+}
+
 /** Stops and rewinds the currently playing cue sound, if any. */
 function stopVigourCue() {
   if (vigourCurrentCueAudio) {
     vigourCurrentCueAudio.pause();
     vigourCurrentCueAudio.currentTime = 0;
+    vigourCurrentCueAudio.loop = false;
     vigourCurrentCueAudio = null;
   }
+}
+
+/** Fixed cue used for the headphone/volume-calibration screen (block-1 bird cue). */
+function vigourCalibrationCueFile() {
+  return vigourCueFile(1, 1);
 }
 
 /**
@@ -746,5 +760,8 @@ export {
   getHandednessLabel,
   HOLD_KEYS,
   vigourCuePreloadAudio,
-  resolveVigourNBlocks
+  resolveVigourNBlocks,
+  playVigourCueLoop,
+  stopVigourCue,
+  vigourCalibrationCueFile
 }
