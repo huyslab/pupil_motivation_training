@@ -256,7 +256,7 @@ const startConfirmation = {
     const hand = getHandednessLabel();
     return `
   <div id="instruction-text">
-      <p>You will now play the piggy-bank game without a break for about <strong>four minutes</strong>.</p>
+      <p>You will now play the piggy-bank game without a break for about <strong>three minutes</strong>.</p>
       <p>When you're ready, place your <strong>${hand} hand's index, middle and ring fingers</strong> on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys and keep them <strong>held down</strong> throughout the game.</p>
       <p>Use the <strong>little finger of your ${hand} hand</strong> to tap the <span class="spacebar-icon">${label}</span> key, as shown below.</p>
       <img src="./assets/images/piggy-banks/vigour_key.png" style="width:250px;" alt="Key press illustration">
