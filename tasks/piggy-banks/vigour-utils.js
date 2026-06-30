@@ -172,9 +172,9 @@ function vigourTrialCue(magnitude, ratio, block) {
 }
 
 /**
- * Every participant uses all six cue identities (the Latin square is a cyclic
- * permutation), so the set of audio files to preload is just each identity at each
- * block's version, independent of participant.
+ * All audio to preload for the vigour task: every cue identity at each block's
+ * version (every participant uses all six cue identities, so this is independent
+ * of participant), plus the coin reward sounds.
  * @param {number} nBlocks
  * @returns {string[]} de-duplicated list of audio file paths
  */
@@ -185,6 +185,8 @@ function vigourCuePreloadAudio(nBlocks) {
       files.push(vigourCueFile(identity, vigourCueVersionForBlock(block)));
     }
   }
+  // Coin reward sounds (one per magnitude).
+  VIGOUR_MAGNITUDES.forEach(m => files.push(vigourCoinSoundFile(m)));
   return [...new Set(files)];
 }
 
@@ -245,6 +247,33 @@ function stopVigourCue() {
 /** Fixed cue used for the headphone/volume-calibration screen (block-1 bird cue). */
 function vigourCalibrationCueFile() {
   return vigourCueFile(1, 1);
+}
+
+// --- Coin reward sounds ---
+// A short sound plays each time a coin falls, matching the Python task
+// (REWARD_SOUND_VOLUME = 0.70, overlap enabled). Files are 1pclickres.mp3 /
+// 5pclickres.mp3, one per coin magnitude.
+const VIGOUR_REWARD_SOUND_VOLUME = 0.70;
+
+/** Audio file for the coin reward sound of a given magnitude (1p or 5p). */
+function vigourCoinSoundFile(magnitude) {
+  return `${VIGOUR_CUE_AUDIO_DIR}${magnitude}pclickres.mp3`;
+}
+
+/**
+ * Plays the coin reward sound for a magnitude. A fresh element is used per call
+ * so coins earned in quick succession overlap rather than cutting each other off
+ * (matching the Python task's REWARD_SOUND_OVERLAP_ENABLED). No-op for magnitudes
+ * without a coin sound (e.g. the demo's magnitude-0 coin).
+ */
+function playVigourCoinSound(magnitude) {
+  if (!VIGOUR_MAGNITUDES.includes(magnitude)) return;
+  const audio = new Audio(vigourCoinSoundFile(magnitude));
+  audio.volume = VIGOUR_REWARD_SOUND_VOLUME;
+  const playPromise = audio.play();
+  if (playPromise && typeof playPromise.catch === "function") {
+    playPromise.catch(() => {});
+  }
 }
 
 /**
@@ -308,6 +337,10 @@ function dropCoin(magnitude, persist = false) {
   const coinContainer = document.getElementById(containerType);
   const coin = createCoin(magnitude);
   coinContainer.appendChild(coin);
+
+  // Play the matching coin sound (1p vs 5p), as in the Python task. No-op for the
+  // demo's magnitude-0 coin, which has no reward sound.
+  playVigourCoinSound(magnitude);
 
   const animationOptions = getCoinAnimationOptions(magnitude);
   coin.animate(animationOptions.keyframes, animationOptions.config)
