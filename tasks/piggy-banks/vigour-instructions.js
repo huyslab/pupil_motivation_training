@@ -275,7 +275,7 @@ const startConfirmation = {
       <p>You will now play the piggy-bank game without a break for about <strong>three minutes</strong>.</p>
       <p>When you're ready, place your <strong>${hand} hand's index, middle and ring fingers</strong> on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys and keep them <strong>held down</strong> throughout the game.</p>
       <p>Use the <strong>little finger of your ${hand} hand</strong> to tap the <span class="spacebar-icon">${label}</span> key, as shown below.</p>
-      <img src="./assets/images/piggy-banks/vigour_key.png" style="width:250px;" alt="Key press illustration">
+      <img src="./assets/images/piggy-banks/keys_${hand}.jpg" style="width:250px;" alt="Key press illustration">
       <p>While holding the three keys, tap <span class="spacebar-icon">${label}</span> once to begin.</p>
       <p>If you want to start over from the beginning, press <span class="spacebar-icon">R</span>.</p>
   </div>
@@ -297,10 +297,8 @@ const startConfirmation = {
 
 /**
  * Dedicated screen that explains the hold-and-tap response method before the
- * demo, introducing the two parts one step at a time. Adapts the tap key and
- * hand to the participant's handedness.
- * NOTE: vigour_key.png is a placeholder image (shows the old key) until the new
- * photo of the keys is added.
+ * demo, introducing the two parts one step at a time. Adapts the tap key, hand
+ * and key photo (keys_left.jpg / keys_right.jpg) to the participant's handedness.
  */
 const holdKeysInstruction = {
   type: jsPsychInstructions,
@@ -325,7 +323,7 @@ const holdKeysInstruction = {
     <p>Using your <strong>${hand} hand</strong>, place three fingers on the <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span> keys:</p>
     <p>your <strong>index, middle and ring fingers</strong>.</p>
     <p><strong>Hold all three keys down</strong>, and keep holding them the whole time you play.</p>
-    <img src="./assets/images/piggy-banks/vigour_key.png" style="width:220px;" alt="Keys to hold">
+    <img src="./assets/images/piggy-banks/keys_${hand}.jpg" style="width:220px;" alt="Keys to hold">
   </div>
       `,
       // Step 3: the tapping part
@@ -335,7 +333,7 @@ const holdKeysInstruction = {
     <p>While you keep holding <span class="spacebar-icon">F</span>, <span class="spacebar-icon">T</span> and <span class="spacebar-icon">H</span>,</p>
     <p>tap the <span class="spacebar-icon">${label}</span> key with the <strong>little finger of your ${hand} hand</strong>.</p>
     <p>Each tap gives the piggy bank a shake. The more you tap, the more coins you get!</p>
-    <img src="./assets/images/piggy-banks/vigour_key.png" style="width:220px;" alt="Key to tap">
+    <img src="./assets/images/piggy-banks/keys_${hand}.jpg" style="width:220px;" alt="Key to tap">
   </div>
       `
     ];

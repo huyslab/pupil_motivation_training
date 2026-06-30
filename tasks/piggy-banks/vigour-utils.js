@@ -292,8 +292,10 @@ let trialState = {
 
 // Array of image paths to preload for the vigour task
 const VIGOUR_PRELOAD_IMAGES = [
-        "1p-num.png", "2p-num.png", "5p-num.png", "10p-num.png", "piggy-bank.png", 
-        "ooc_2p.png", "piggy-tail2.png", "saturate-icon.png", "tail-icon.png"
+        "1p-num.png", "2p-num.png", "5p-num.png", "10p-num.png", "piggy-bank.png",
+        "ooc_2p.png", "piggy-tail2.png", "saturate-icon.png", "tail-icon.png",
+        // Both handedness key photos; the one shown depends on the handedness choice.
+        "keys_left.jpg", "keys_right.jpg"
       ].map(s => "./assets/images/piggy-banks/" + s);
 
 /**
