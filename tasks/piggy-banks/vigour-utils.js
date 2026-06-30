@@ -40,7 +40,7 @@ const ratios = [...new Set(VIGOUR_CONDITIONS.map(c => c.ratio))].sort((a, b) => 
 // Latin square keyed on the participant number, using the exact same logic as the
 // Python task (make_latin_square_cue_mapping), so the same participant hears the
 // same cue for the same condition in both versions.
-const VIGOUR_CUE_AUDIO_DIR = "./assets/images/piggy-banks/audio/";
+const VIGOUR_CUE_AUDIO_DIR = "./assets/audio/";
 const VIGOUR_N_CUE_IDENTITIES = 6;
 // cue identity (1-6) -> { prefix used in the audio filename, human-readable label }.
 // Mirrors CUE_IDENTITY_LABELS / CUE_IDENTITY_FILE_LABELS in pilot5_0.py (note the
